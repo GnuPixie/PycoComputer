@@ -1,0 +1,11 @@
+repos:
+-   repo: local
+    hooks:
+    -   id: fmt-autostage
+        name: Format and Stage Changes
+        # Use 'pixi run -e dev python' to guarantee we use the right environment
+        entry: pixi run -e dev python scripts/pre_commit_helper.py
+        language: system
+        types: [python]
+        always_run: true
+        pass_filenames: true

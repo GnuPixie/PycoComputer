@@ -1,0 +1,86 @@
+# ==========================================
+# Pixi Configuration for PycoComputer
+# ==========================================
+
+[workspace]
+name = "PycoComputer"
+version = "0.1.0"
+description = "A modern IDE and emulator for the picoComputer architecture."
+authors = ["Stefan Jovanović"]
+# Use conda-forge as the primary channel for package resolution.
+channels = ["conda-forge"]
+# Ensure dependencies are resolved for cross-platform compatibility.
+platforms = ["linux-64", "win-64", "osx-64", "osx-arm64"]
+
+
+# ==========================================
+# Global Task Definitions (`pixi run <task_name>`)
+# ==========================================
+[tasks]
+
+# Starts the main application entry point.
+start = "python src/main.py"
+
+
+# ==========================================
+# Project Dependencies
+# ==========================================
+[dependencies]
+
+# Constrain the Python version to ensure API stability.
+python = ">=3.9,<=3.14"
+# GUI framework (Qt for Python).
+pyside6 = "*"
+
+
+# ==========================================
+# Development-Only Dependencies & Features
+# ==========================================
+# 'feature' defines optional dependency groups. The 'dev' feature contains
+# tools for development that are not needed in the final build.
+[feature.dev.dependencies]
+
+# Application packager.
+pyinstaller = "*"
+# The 'black' code formatter.
+black = "*"
+# The framework for managing and maintaining pre-commit hooks.
+pre-commit = "*"
+
+
+# ==========================================
+# Development Tasks
+# ==========================================
+# These tasks are only available when the 'dev' feature is active.
+[feature.dev.tasks]
+
+# Format the codebase using black.
+fmt = "black ."
+
+# Build a standalone executable using PyInstaller.
+# --noconsole: Prevents a command window from opening.
+# --onefile:   Bundles everything into a single file.
+# --name:      Sets the output filename.
+# --clean:     Removes temporary files before building.
+build = "pyinstaller --noconsole --onefile --name PycoComputer --clean src/main.py"
+
+# Internal task to install the git hooks. Not intended for direct use.
+_install-hooks = "pre-commit install"
+
+# The main setup task for new contributors. This single command will install
+# all dependencies and activate the pre-commit hooks for auto-formatting.
+setup = { depends-on = ["_install-hooks"], description = "Install dependencies and setup git hooks." }
+
+
+# ==========================================
+# Environment Definitions
+# ==========================================
+# Environments combine features to create specific project setups.
+[environments]
+
+# The default environment used by `pixi install`.
+default = { features = [] }
+
+# The development environment, activated with `pixi install -e dev`.
+# This includes the default dependencies plus the 'dev' feature and dev tasks.
+dev = { features = ["dev"], solve-group = "dev" }
