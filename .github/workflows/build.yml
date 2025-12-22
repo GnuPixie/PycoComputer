@@ -1,68 +1,122 @@
-name: Build Multi-Platform Executables
+name: Automated Version Release
 
 on:
   push:
     branches:
-      - main # Trigger the workflow on pushes to the main branch
-      - workflows
+      - workflows # This workflow monitors the workflows branch
+    tags:
+      - 'v*' # This workflow also builds releases when a tag is pushed
 
 jobs:
-  # STEP 1: Build an executable for each operating system in parallel
-  build:
+  # JOB 1: Monitor for version changes on the 'workflows' branch
+  # This job runs on every push to workflows, checks pixi.toml, and creates a tag if the version is new.
+  version-monitor:
+    # Only run this job on pushes to the workflows branch, NOT on tag pushes.
+    if: startsWith(github.ref, 'refs/heads/workflows')
+    runs-on: ubuntu-latest
+    outputs:
+      new_version: ${{ steps.check.outputs.new_version }}
+      tag: ${{ steps.check.outputs.tag }}
+
+    # Grant permissions to write tags back to the repository
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+        with:
+          # Fetch all history so we can compare the file against the previous commit
+          fetch-depth: 0
+
+      - name: Find changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v44
+        with:
+          files: pixi.toml
+
+      - name: Check for new version in pixi.toml
+        id: check
+        # This step only runs if pixi.toml was among the changed files
+        if: steps.changed-files.outputs.any_changed == 'true'
+        run: |
+          # Get the version from the current pixi.toml
+          VERSION=$(grep 'version =' pixi.toml | cut -d '"' -f 2)
+          echo "Found version in pixi.toml: $VERSION"
+
+          # Check if a tag for this version already exists
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "Tag v$VERSION already exists. Nothing to do."
+            echo "new_version=false" >> $GITHUB_OUTPUT
+          else
+            echo "Tag v$VERSION does not exist. A new release will be created."
+            echo "new_version=true" >> $GITHUB_OUTPUT
+            echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create and push new Git tag
+        if: steps.check.outputs.new_version == 'true'
+        run: |
+          # Configure git user for the commit
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Create and push the tag
+          git tag ${{ steps.check.outputs.tag }}
+          git push origin ${{ steps.check.outputs.tag }}
+
+  # JOB 2: Build and create the release
+  # This job ONLY runs when a new tag (like 'v1.2.3') is pushed.
+  # This is triggered by the 'version-monitor' job above, or by a manual tag push.
+  release:
+    # Only run this job on pushes to tags.
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: version-monitor # Wait for the monitor, though it won't run on tags
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
 
     steps:
-    - name: Check out repository code
-      uses: actions/checkout@v4
+      - name: Check out repository code
+        uses: actions/checkout@v4
+      - name: Install Pixi
+        uses: prefix-dev/setup-pixi@v0.5.1
+      - name: Install dependencies
+        run: pixi install -e dev
+      - name: Build with Pixi task
+        run: pixi run build
+      - name: Rename executable for release
+        run: |
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            mv dist/PycoComputer.exe dist/PycoComputer-windows.exe
+          elif [ "${{ runner.os }}" == "Linux" ]; then
+            mv dist/PycoComputer dist/PycoComputer-linux
+          else
+            mv dist/PycoComputer dist/PycoComputer-macos
+          fi
+      - name: Upload artifact for release
+        uses: actions/upload-artifact@v4
+        with:
+          name: executable-${{ matrix.os }}
+          path: dist/*
 
-    - name: Set up Python 3.14
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.14'
-
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install pyinstaller PySide6
-
-    - name: Build with PyInstaller
-      run: pyinstaller --noconsole --onefile --name PycoComputer --clean src/main.py
-
-    - name: Upload the executable as an artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: executable-${{ matrix.os }} # Unique artifact name for each OS
-        path: dist/ # PyInstaller's output directory
-
-  # STEP 2: Package all executables into a single folder
-  package:
+  # JOB 3: Combine artifacts and publish the GitHub Release
+  # This job runs after all builds are complete.
+  publish-release:
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
-    needs: build # This job will only run after all 'build' jobs are successful
-
+    needs: release # Wait for all matrix jobs to finish
     steps:
-    - name: Create a directory for the executables
-      run: mkdir executables
-
-    - name: Download all build artifacts
-      uses: actions/download-artifact@v4
-      with:
-        path: artifacts # Download all artifacts into this folder
-
-    - name: Display structure of downloaded files
-      run: ls -R artifacts
-
-    - name: Organize executables into one folder
-      run: |
-        # Move executables and rename for clarity
-        mv artifacts/executable-ubuntu-latest/PycoComputer executables/PycoComputer-linux
-        mv artifacts/executable-windows-latest/PycoComputer.exe executables/PycoComputer.exe
-        mv artifacts/executable-macos-latest/PycoComputer executables/PycoComputer-macos
-
-    - name: Upload the final 'executables' folder
-      uses: actions/upload-artifact@v4
-      with:
-        name: executables
-        path: executables/
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            artifacts/executable-ubuntu-latest/*
+            artifacts/executable-windows-latest/*
+            artifacts/executable-macos-latest/*
