@@ -1,0 +1,48 @@
+name: Version Tagger
+on:
+  push:
+    branches: [workflows]
+    paths: [pixi.toml]
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # Use the PAT here to ensure subsequent git commands use it by default for fetching/pushing
+          token: ${{ secrets.RELEASE_TOKEN }} 
+
+      - name: Extract Version
+        id: get_version
+        run: |
+          # 1. Capture the version in a bash variable
+          VER=$(python3 -c 'import tomllib; d=tomllib.load(open("pixi.toml", "rb")); print(d.get("workspace", {}).get("version") or d.get("project", {}).get("version") or d.get("package", {}).get("version") or d.get("version"))')
+          
+          # 2. Print it for debugging
+          echo "Detected version: $VER"
+          
+          # 3. CRITICAL: Write it to $GITHUB_OUTPUT so subsequent steps can read it
+          echo "VERSION=$VER" >> "$GITHUB_OUTPUT"
+
+      - name: Push Tag
+        env:
+          # Ensure this Secret contains a valid Personal Access Token (PAT)
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          # Now this will correctly resolve to something like v0.1.0
+          TAG="v${{ steps.get_version.outputs.VERSION }}"
+          
+          echo "Processing tag: $TAG"
+          
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git tag "$TAG"
+            git push origin "$TAG"
+          fi

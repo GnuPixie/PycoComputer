@@ -1,0 +1,59 @@
+name: Build & Release
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            suffix: linux
+          - os: windows-latest
+            suffix: windows.exe
+          - os: macos-latest
+            suffix: macos
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: prefix-dev/setup-pixi@v0.8.1 # Updated version
+      
+      - name: Build
+        run: |
+          pixi install -e dev
+          pixi run build
+          
+      - name: Rename & Checksum
+        shell: bash
+        run: |
+          mkdir -p final_dist
+          # Find the binary regardless of exact name (assumes one main file in dist)
+          BIN=$(find dist -maxdepth 1 -type f -not -name "*.txt" | head -n 1)
+          TARGET="final_dist/PycoComputer-${{ matrix.suffix }}"
+          mv "$BIN" "$TARGET"
+          # Create checksum for this specific file
+          cd final_dist && shasum -a 256 $(basename "$TARGET") > $(basename "$TARGET").sha256
+          
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: bin-${{ matrix.suffix }}
+          path: final_dist/*
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: all-bins
+          merge-multiple: true
+          
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: all-bins/*
