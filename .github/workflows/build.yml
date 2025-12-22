@@ -3,80 +3,55 @@ name: Automated Version Release
 on:
   push:
     branches:
-      - workflows # This workflow monitors the workflows branch
+      - workflows # Monitors this branch for version bumps
     tags:
-      - 'v*' # This workflow also builds releases when a tag is pushed
+      - 'v*' # Builds releases when a tag is pushed
 
 jobs:
-  # JOB 1: Monitor for version changes on the 'workflows' branch
-  # This job runs on every push to workflows, checks pixi.toml, and creates a tag if the version is new.
+  # JOB 1: Monitor for version changes and create a tag.
   version-monitor:
-    # Only run this job on pushes to the workflows branch, NOT on tag pushes.
     if: startsWith(github.ref, 'refs/heads/workflows')
     runs-on: ubuntu-latest
     outputs:
-      new_version: ${{ steps.check.outputs.new_version }}
       tag: ${{ steps.check.outputs.tag }}
-
-    # Grant permissions to write tags back to the repository
     permissions:
-      contents: write
-
+      contents: write # Allow writing tags
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
-        with:
-          # Fetch all history so we can compare the file against the previous commit
-          fetch-depth: 0
-
       - name: Find changed files
         id: changed-files
         uses: tj-actions/changed-files@v44
         with:
           files: pixi.toml
-
       - name: Check for new version in pixi.toml
         id: check
-        # This step only runs if pixi.toml was among the changed files
         if: steps.changed-files.outputs.any_changed == 'true'
         run: |
-          # Get the version from the current pixi.toml
           VERSION=$(grep 'version =' pixi.toml | cut -d '"' -f 2)
           echo "Found version in pixi.toml: $VERSION"
-
-          # Check if a tag for this version already exists
           if git rev-parse "v$VERSION" >/dev/null 2>&1; then
             echo "Tag v$VERSION already exists. Nothing to do."
-            echo "new_version=false" >> $GITHUB_OUTPUT
           else
             echo "Tag v$VERSION does not exist. A new release will be created."
-            echo "new_version=true" >> $GITHUB_OUTPUT
             echo "tag=v$VERSION" >> $GITHUB_OUTPUT
           fi
-
       - name: Create and push new Git tag
-        if: steps.check.outputs.new_version == 'true'
+        if: steps.check.outputs.tag
         run: |
-          # Configure git user for the commit
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # Create and push the tag
           git tag ${{ steps.check.outputs.tag }}
           git push origin ${{ steps.check.outputs.tag }}
 
-  # JOB 2: Build and create the release
-  # This job ONLY runs when a new tag (like 'v1.2.3') is pushed.
-  # This is triggered by the 'version-monitor' job above, or by a manual tag push.
+  # JOB 2: Build the executables when a tag is pushed.
   release:
-    # Only run this job on pushes to tags.
     if: startsWith(github.ref, 'refs/tags/')
-    needs: version-monitor # Wait for the monitor, though it won't run on tags
+    # REMOVED: needs: version-monitor <-- This was the line causing the problem.
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
@@ -101,12 +76,11 @@ jobs:
           name: executable-${{ matrix.os }}
           path: dist/*
 
-  # JOB 3: Combine artifacts and publish the GitHub Release
-  # This job runs after all builds are complete.
+  # JOB 3: Combine artifacts and publish the GitHub Release.
   publish-release:
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
-    needs: release # Wait for all matrix jobs to finish
+    needs: release # This dependency is correct, it waits for all builds.
     steps:
       - name: Download all build artifacts
         uses: actions/download-artifact@v4
