@@ -19,11 +19,16 @@ jobs:
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
+        with:
+          # Fetch all history so we can check if tags exist
+          fetch-depth: 0 
+
       - name: Find changed files
         id: changed-files
         uses: tj-actions/changed-files@v44
         with:
           files: pixi.toml
+
       - name: Check for new version in pixi.toml
         id: check
         if: steps.changed-files.outputs.any_changed == 'true'
@@ -36,18 +41,26 @@ jobs:
             echo "Tag v$VERSION does not exist. A new release will be created."
             echo "tag=v$VERSION" >> $GITHUB_OUTPUT
           fi
+
       - name: Create and push new Git tag
         if: steps.check.outputs.tag
+        env:
+          # You must create this secret in your Repo Settings -> Secrets
+          # A standard GITHUB_TOKEN will not trigger the next workflow.
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          
           git tag ${{ steps.check.outputs.tag }}
+          
+          # Use the PAT to push so that GitHub triggers the 'on: tags' workflow
+          git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}
           git push origin ${{ steps.check.outputs.tag }}
 
   # JOB 2: Build the executables when a tag is pushed.
   release:
     if: startsWith(github.ref, 'refs/tags/')
-    # REMOVED: needs: version-monitor <-- This was the line causing the problem.
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
@@ -55,13 +68,18 @@ jobs:
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
+
       - name: Install Pixi
         uses: prefix-dev/setup-pixi@v0.5.1
+
       - name: Install dependencies
         run: pixi install -e dev
+
       - name: Build with Pixi task
         run: pixi run build
+
       - name: Rename executable for release
+        shell: bash
         run: |
           if [ "${{ runner.os }}" == "Windows" ]; then
             mv dist/PycoComputer.exe dist/PycoComputer-windows.exe
@@ -70,6 +88,7 @@ jobs:
           else
             mv dist/PycoComputer dist/PycoComputer-macos
           fi
+
       - name: Upload artifact for release
         uses: actions/upload-artifact@v4
         with:
@@ -86,6 +105,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
