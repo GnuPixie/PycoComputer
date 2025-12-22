@@ -660,7 +660,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("pycoComputer IDE V2")
+        self.setWindowTitle("pycoComputer IDE V4")
         self.resize(1300, 850)
 
         # Settings management

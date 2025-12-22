@@ -4,7 +4,7 @@
 
 [workspace]
 name = "PycoComputer"
-version = "0.1.2"
+version = "0.1.4"
 description = "A modern IDE and emulator for the picoComputer architecture."
 authors = ["Stefan Jovanović"]
 # Use conda-forge as the primary channel for package resolution.
