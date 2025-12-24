@@ -51,7 +51,7 @@ jobs:
             suffix: windows.exe
           - os: macos-latest
             suffix: macos
-          - os: macos-13
+          - os: macos-15-intel
             suffix: macos-intel
 
     runs-on: ${{ matrix.os }}
