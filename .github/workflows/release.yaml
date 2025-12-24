@@ -24,7 +24,7 @@ jobs:
         id: check
         run: |
           # Extract version from pixi.toml using basic python (std lib)
-          NEW_VER=$(python3 -c 'import tomllib; print(tomllib.load(open("pixi.toml", "rb"))["project"]["version"])')
+          NEW_VER=$(python3 -c 'import tomllib; print(tomllib.load(open("pixi.toml", "rb"))["workspace"]["version"])')
           echo "Detected version: $NEW_VER"
           
           # Check if tag exists
