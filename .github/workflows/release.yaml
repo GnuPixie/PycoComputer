@@ -28,12 +28,22 @@ jobs:
         shell: bash
         run: |
           mkdir -p final_dist
-          # Find the binary regardless of exact name (assumes one main file in dist)
+          # Find the binary regardless of exact name
           BIN=$(find dist -maxdepth 1 -type f -not -name "*.txt" | head -n 1)
           TARGET="final_dist/PycoComputer-${{ matrix.suffix }}"
           mv "$BIN" "$TARGET"
-          # Create checksum for this specific file
-          cd final_dist && shasum -a 256 $(basename "$TARGET") > $(basename "$TARGET").sha256
+          
+          # Create checksum handling OS differences
+          cd final_dist
+          FILENAME=$(basename "$TARGET")
+          
+          if command -v shasum >/dev/null 2>&1; then
+            # macOS / Linux
+            shasum -a 256 "$FILENAME" > "$FILENAME.sha256"
+          else
+            # Windows (Git Bash has sha256sum, but not shasum)
+            sha256sum "$FILENAME" > "$FILENAME.sha256"
+          fi
           
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
