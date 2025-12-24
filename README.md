@@ -21,11 +21,19 @@ This architecture is central to the "Programming 1" curriculum at the School of 
 
 ## Installation & Usage
 
-### Method 1: Using Pixi (Recommended)
+### Method 1: Standalone Executable (Easiest)
 
-This project is managed with [Pixi](https://pixi.prefix.dev/latest/), which handles Python versions and dependencies automatically.
+The simplest way to run the application. No Python installation or environment setup is required.
 
-#### For Users (Just Running the App)
+1. Visit the [GitHub Releases](https://github.com/GnuPixie/PycoComputer/releases) page.
+1. Download the executable compatible with your operating system (Windows, Linux, or macOS).
+1. Run the downloaded file directly.
+
+### Method 2: Using Pixi (Recommended for Developers)
+
+This project utilizes [Pixi](https://pixi.prefix.dev/latest/) to automatically manage Python versions and dependencies, ensuring a consistent development environment.
+
+#### For Users (Run from Source)
 
 1. **Clone and Run:**
 
@@ -37,16 +45,14 @@ This project is managed with [Pixi](https://pixi.prefix.dev/latest/), which hand
 
 #### For Developers (Setup & Tools)
 
-1. **Initial Setup:**
-    Run this once to install development tools and activate automatic code formatting:
+1. **Initial Setup:** Install development tools and activate automatic code formatting:
 
     ```bash
     pixi run -e dev setup
     ```
 
-    *Note: This automatically installs a git hook that formats your code every time you commit.*
-
-2. **Build executable:**
+    *Note: This installs a git hook that automatically formats your code on every commit.*
+2. **Build Executable:** Generate a standalone file for your system:
 
     ```bash
     pixi run -e dev build
@@ -58,17 +64,17 @@ This project is managed with [Pixi](https://pixi.prefix.dev/latest/), which hand
     pixi run -e dev fmt
     ```
 
-### Method 2: Standard Python (pip)
+### Method 3: Standard Python (pip)
 
-If you prefer not to use Pixi, you can use a standard Python installation (requires Python 3.9+).
+If you prefer manual management, ensure you have **Python 3.9+** installed.
 
-1. **Install dependencies:**
+1. **Install Dependencies:**
 
     ```bash
     pip install PySide6
     ```
 
-2. **Run the application:**
+2. **Launch Application:**
 
     ```bash
     python src/main.py
@@ -97,7 +103,7 @@ If you prefer not to use Pixi, you can use a standard Python installation (requi
 
 Moderno razvojno okruženje (IDE) i emulator za **picoComputer** arhitekturu, razvijeno u Python-u uz pomoć PySide6 biblioteke.
 
-Ova arhitektura je sastavni deo predmeta "Programiranje 1" na Elektrotehničkom fakultetu (ETF) u Beogradu. Alat simulira pojednostavljeni 16-bitni procesor sa ciljem lakšeg savladavanja asemblerskog jezika, koncepta adresiranja memorije i životnog ciklusa instrukcija.
+Ova arhitektura je sastavni deo predmeta "Programiranje 1" na Elektrotehničkom fakultetu Univerziteta u Beogradu. Alat simulira pojednostavljeni 16-bitni procesor sa ciljem lakšeg savladavanja asemblerskog jezika, koncepta adresiranja memorije i životnog ciklusa instrukcija.
 
 ### Mogućnosti
 
@@ -108,13 +114,21 @@ Ova arhitektura je sastavni deo predmeta "Programiranje 1" na Elektrotehničkom 
 * **16-bitna Arhitektura:** Verno simuliranje aritmetičkog prekoračenja (*overflow*), rada sa označenim brojevima i memorijskog adresiranja.
 * **Tamna Tema:** Integrisan moderni "Dracula" vizuelni stil.
 
-### Instalacija i Pokretanje
+## Instalacija i Pokretanje
 
-#### Metod 1: Korišćenje Pixi-ja (Preporučeno)
+### Metod 1: Izvršni fajl (Najlakše)
 
-Ovaj projekat koristi [Pixi](https://pixi.prefix.dev/latest/) za upravljanje zavisnostima i okruženjem. Ovo je najlakši način za pokretanje jer ne zahteva ručnu instalaciju Python-a.
+Najjednostavniji način za pokretanje aplikacije. Nije potrebna instalacija Python-a niti podešavanje okruženja.
 
-#### Za Korisnike (Samo pokretanje aplikacije)
+1. Posetite stranicu [GitHub Releases](https://github.com/GnuPixie/PycoComputer/releases).
+1. Preuzmite izvršni fajl za vaš operativni sistem (Windows, Linux ili macOS).
+1. Pokrenite preuzeti fajl direktno.
+
+### Metod 2: Korišćenje Pixi-ja (Preporučeno za programere)
+
+Ovaj projekat koristi [Pixi](https://pixi.prefix.dev/latest/) za automatsko upravljanje verzijama Python-a i zavisnostima, čime se osigurava stabilno razvojno okruženje.
+
+#### Za korisnike (Pokretanje iz izvornog koda)
 
 1. **Klonirajte i pokrenite:**
 
@@ -124,32 +138,30 @@ Ovaj projekat koristi [Pixi](https://pixi.prefix.dev/latest/) za upravljanje zav
     pixi run start
     ```
 
-#### Za Programere (Podešavanje i alati)
+#### Za programere (Podešavanje i alati)
 
-1. **Inicijalno podešavanje:**
-    Pokrenite ovu komandu jednom kako biste instalirali sve alate i aktivirali automatsko formatiranje koda:
+1. **Inicijalno podešavanje:** Instalirajte razvojne alate i aktivirajte automatsko formatiranje koda:
 
     ```bash
     pixi run -e dev setup
     ```
 
-    *Napomena: Ovo automatski instalira git hook koji formatira kod prilikom svakog commit-a.*
-
-2. **Kreiranje izvršnog fajla:**
+    *Napomena: Ovo instalira git hook koji automatski formatira vaš kod prilikom svakog commit-a.*
+1. **Kreiranje izvršnog fajla:** Generišite fajl za vaš sistem:
 
     ```bash
     pixi run -e dev build
     ```
 
-3. **Ručno formatiranje:**
+1. **Ručno formatiranje:**
 
     ```bash
     pixi run -e dev fmt
     ```
 
-### Metod 2: Standardni Python (pip)
+### Metod 3: Standardni Python (pip)
 
-Ukoliko ne želite da koristite Pixi, možete koristiti standardnu Python instalaciju (potreban je Python 3.9+).
+Ukoliko preferirate ručno upravljanje, neophodan vam je **Python 3.9+**.
 
 1. **Instalirajte biblioteke:**
 
@@ -157,7 +169,7 @@ Ukoliko ne želite da koristite Pixi, možete koristiti standardnu Python instal
     pip install PySide6
     ```
 
-2. **Pokrenite aplikaciju:**
+1. **Pokrenite aplikaciju:**
 
     ```bash
     python src/main.py
