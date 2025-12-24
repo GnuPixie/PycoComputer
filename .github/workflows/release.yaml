@@ -1,11 +1,48 @@
-name: Build & Release
+name: Release Pipeline
+
 on:
   push:
-    tags: ['v*']
+    branches: [main, workflows] # Add your main branch here
+    paths: ['pixi.toml']
+
+permissions:
+  contents: write
 
 jobs:
+  # Job 1: Check if the version in pixi.toml is different from the latest Git tag
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      should_release: ${{ steps.check.outputs.should_release }}
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Necessary to see previous tags
+
+      - name: Check Version Change
+        id: check
+        run: |
+          # Extract version from pixi.toml using basic python (std lib)
+          NEW_VER=$(python3 -c 'import tomllib; print(tomllib.load(open("pixi.toml", "rb"))["project"]["version"])')
+          echo "Detected version: $NEW_VER"
+          
+          # Check if tag exists
+          if git rev-parse "v$NEW_VER" >/dev/null 2>&1; then
+            echo "Tag v$NEW_VER already exists. Skipping release."
+            echo "should_release=false" >> $GITHUB_OUTPUT
+          else
+            echo "New version detected."
+            echo "should_release=true" >> $GITHUB_OUTPUT
+            echo "version=$NEW_VER" >> $GITHUB_OUTPUT
+          fi
+
+  # Job 2: Build Binaries (Only runs if version is new)
   build:
+    needs: check-version
+    if: needs.check-version.outputs.should_release == 'true'
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
@@ -14,56 +51,82 @@ jobs:
             suffix: windows.exe
           - os: macos-latest
             suffix: macos
+          - os: macos-13
+            suffix: macos-intel
+
     runs-on: ${{ matrix.os }}
+
     steps:
       - uses: actions/checkout@v4
-      - uses: prefix-dev/setup-pixi@v0.8.1 # Updated version
-      
+      - uses: prefix-dev/setup-pixi@v0.9.3
+        with:
+          pixi-version: v0.62.2 # Pinning versions is "safer"
+
       - name: Build
         run: |
-          pixi install -e dev
           pixi run build
-          
-      - name: Rename & Checksum
-        shell: bash
+
+      - name: Package & Checksum (Python)
+        shell: python
+        env:
+          SUFFIX: ${{ matrix.suffix }}
         run: |
-          mkdir -p final_dist
-          # Find the binary regardless of exact name
-          BIN=$(find dist -maxdepth 1 -type f -not -name "*.txt" | head -n 1)
-          TARGET="final_dist/PycoComputer-${{ matrix.suffix }}"
-          mv "$BIN" "$TARGET"
-          
-          # Create checksum handling OS differences
-          cd final_dist
-          FILENAME=$(basename "$TARGET")
-          
-          if command -v shasum >/dev/null 2>&1; then
-            # macOS / Linux
-            shasum -a 256 "$FILENAME" > "$FILENAME.sha256"
-          else
-            # Windows (Git Bash has sha256sum, but not shasum)
-            sha256sum "$FILENAME" > "$FILENAME.sha256"
-          fi
-          
+          import os
+          import glob
+          import shutil
+          import hashlib
+
+          os.makedirs("final_dist", exist_ok=True)
+
+          # Find the binary in dist/ (robust cross-platform globbing)
+          # Exclude .txt files if you have requirements.txt there
+          files = [f for f in glob.glob("dist/*") if os.path.isfile(f) and not f.endswith(".txt")]
+
+          if not files:
+              raise FileNotFoundError("No binary found in dist/")
+
+          bin_path = files[0] # Assume one binary
+          target_name = f"final_dist/PycoComputer-{os.environ['SUFFIX']}"
+
+          print(f"Moving {bin_path} -> {target_name}")
+          shutil.move(bin_path, target_name)
+
+          # Create SHA256 (Pure Python = 100% Cross Platform Safe)
+          sha256_hash = hashlib.sha256()
+          with open(target_name, "rb") as f:
+              # Read in chunks to handle large binaries efficiently
+              for byte_block in iter(lambda: f.read(4096), b""):
+                  sha256_hash.update(byte_block)
+
+          checksum_file = f"{target_name}.sha256"
+          # Write checksum file in standard format: "HASH  FILENAME"
+          with open(checksum_file, "w") as f:
+              f.write(f"{sha256_hash.hexdigest()}  {os.path.basename(target_name)}")
+
+          print(f"Checksum created: {checksum_file}")
+
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: bin-${{ matrix.suffix }}
           path: final_dist/*
 
+  # Job 3: Create Release
   publish:
-    needs: build
+    needs: [check-version, build]
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/download-artifact@v4
         with:
           path: all-bins
           merge-multiple: true
-          
-      - name: Create Release
+
+      - name: Create Release and Tag
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ needs.check-version.outputs.version }}
+          name: Release v${{ needs.check-version.outputs.version }}
+          draft: false
+          prerelease: false
           generate_release_notes: true
           files: all-bins/*
